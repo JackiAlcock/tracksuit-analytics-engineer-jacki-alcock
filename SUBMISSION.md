@@ -97,3 +97,4 @@ proper SCD2 dimension once segment history exists, alerting on
 - More sepcific linting conventionos enforced on commits
 - PR templates with checklists for pre-review steps (eg requiring evidence of a fulll run and regression testing)
 - SCD2 dimension modelling for all events-based source data
+- Enforce Github review by Copilot and then peers prior to merge
