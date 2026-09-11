@@ -1,0 +1,71 @@
+version: 2
+
+models:
+  - name: stg_hubspot__companies
+    description: One row per HubSpot company (CRM record), typed and lightly cleaned.
+    columns:
+      - name: company_id
+        description: Primary key. The current (post-merge) HubSpot company ID.
+        data_tests:
+          - unique
+          - not_null
+      - name: size_grouped
+        description: Customer size segment — the dimension GRR is segmented by.
+        data_tests:
+          - accepted_values:
+              values: ['Enterprise', 'Mid-Market', 'SMB', 'Startup']
+
+  - name: stg_subskribe__accounts
+    description: One row per Subskribe billing account, typed and lightly cleaned.
+    columns:
+      - name: account_id
+        data_tests:
+          - unique
+          - not_null
+      - name: crmid
+        description: >
+          Reference to a HubSpot company_id. Does not always resolve
+          directly — some values reference companies later merged in
+          HubSpot (resolved via int_company_id_map), and a small number
+          (2 in the current dataset) don't resolve at all.
+        data_tests:
+          - not_null
+
+  - name: stg_subskribe__subscriptions
+    description: >
+      One row per subscription contract term. A customer's continuous
+      history is a chain of these rows linked by
+      renewed_from_subscription_id — see int_subscriptions_chained.
+    columns:
+      - name: subscription_id
+        data_tests:
+          - unique
+          - not_null
+      - name: account_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_subskribe__accounts')
+              field: account_id
+      - name: subscription_state
+        data_tests:
+          - accepted_values:
+              values: ['ACTIVE', 'EXPIRED', 'CANCELED']
+
+  - name: stg_subskribe__invoices
+    description: One row per invoice issued against a subscription.
+    columns:
+      - name: invoice_id
+        data_tests:
+          - unique
+          - not_null
+      - name: subscription_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_subskribe__subscriptions')
+              field: subscription_id
+      - name: status
+        data_tests:
+          - accepted_values:
+              values: ['PAID', 'POSTED', 'VOIDED']

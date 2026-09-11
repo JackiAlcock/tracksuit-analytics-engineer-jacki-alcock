@@ -1,0 +1,34 @@
+version: 2
+
+models:
+  - name: int_company_id_map
+    description: Every id (current or historically merged) a crmid might reference, mapped to the current company_id.
+
+  - name: int_accounts_resolved
+    description: Subskribe accounts joined to their resolved HubSpot company, with unresolved accounts flagged rather than dropped.
+    columns:
+      - name: account_id
+        data_tests:
+          - unique
+          - not_null
+
+  - name: int_subscriptions_chained
+    description: Subscriptions with renewal chains collapsed to a root_subscription_id representing one continuous customer relationship.
+    columns:
+      - name: subscription_id
+        data_tests:
+          - unique
+          - not_null
+
+  - name: int_invoices_monthly
+    description: Billed (non-VOIDED) invoice revenue in NZD, summed by subscription and calendar month.
+
+  - name: int_customer_months
+    description: One row per customer (account) per month they were under an in-force subscription, with that month's revenue.
+    columns:
+      - name: account_id
+        data_tests:
+          - not_null
+      - name: activity_month
+        data_tests:
+          - not_null

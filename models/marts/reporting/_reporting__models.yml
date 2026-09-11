@@ -1,0 +1,14 @@
+version: 2
+
+models:
+  - name: rpt_grr_monthly
+    description: Monthly Gross Revenue Retention by customer size segment, for the last 12 months of available data.
+    columns:
+      - name: report_month
+        data_tests:
+          - not_null
+      - name: size_grouped
+        data_tests:
+          - not_null
+      - name: gross_revenue_retention_pct
+        description: Cohort (M-12) revenue retained at month M, expansion excluded, as a percentage.

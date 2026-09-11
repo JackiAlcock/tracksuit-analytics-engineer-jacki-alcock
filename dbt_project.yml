@@ -15,7 +15,17 @@ clean-targets:
   - "target"
   - "dbt_packages"
 
-# How you organise, layer, name, and materialise your models is up to you.
+# staging  -> 1:1 cleanup/typing of raw sources, no business logic
+# intermediate -> purpose-built transforms (entity resolution, renewal-chain
+#                 collapsing, monthly revenue) that only exist to feed marts
+# marts/core -> the reusable dimensional model (dim_customers, fct_subscriptions,
+#               fct_customer_month) — the actual deliverable
+# marts/reporting -> the GRR reporting model built on top of marts/core
 models:
   tracksuit_take_home:
-    +materialized: view
+    staging:
+      +materialized: view
+    intermediate:
+      +materialized: view
+    marts:
+      +materialized: table

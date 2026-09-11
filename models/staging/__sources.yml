@@ -1,0 +1,23 @@
+version: 2
+
+sources:
+  - name: raw
+    description: >
+      Raw, minimally-typed data landed from source systems (HubSpot CRM and
+      Subskribe billing) by load_raw_data.py. Every column is loaded as
+      VARCHAR — this source is intentionally untyped, so casting happens in
+      the staging layer, not here.
+    schema: raw
+    tables:
+      - name: hubspot_companies
+        description: Company records from HubSpot (CRM).
+      - name: subskribe_accounts
+        description: Billing accounts from Subskribe.
+      - name: subskribe_subscriptions
+        description: >
+          Subscriptions per Subskribe billing account. A customer's full
+          history is a chain of these records linked by
+          renewed_from_subscription_id — a new subscription_id is issued at
+          each renewal rather than the original persisting.
+      - name: subskribe_invoices
+        description: Invoices issued against a Subskribe subscription.

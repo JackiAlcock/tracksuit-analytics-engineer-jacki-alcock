@@ -1,0 +1,46 @@
+version: 2
+
+models:
+  - name: dim_customers
+    description: One row per customer (resolved HubSpot company, or the billing account itself where no company resolves), with their segment.
+    columns:
+      - name: customer_id
+        data_tests:
+          - unique
+          - not_null
+      - name: size_grouped
+        data_tests:
+          - accepted_values:
+              values: ['Enterprise', 'Mid-Market', 'SMB', 'Startup', 'Unknown']
+
+  - name: fct_subscriptions
+    description: One row per subscription contract term, linked to its resolved customer and renewal chain.
+    columns:
+      - name: subscription_id
+        data_tests:
+          - unique
+          - not_null
+      - name: customer_id
+        data_tests:
+          - not_null
+
+  - name: fct_customer_month
+    description: >
+      The dimensional model's core mart. One row per customer per calendar
+      month they were an active subscriber, with segment and revenue —
+      reusable for any subscription-over-time analysis, not just GRR.
+    columns:
+      - name: customer_month_id
+        description: Surrogate key (customer_id + month), one row per grain.
+        data_tests:
+          - unique
+          - not_null
+      - name: customer_id
+        data_tests:
+          - not_null
+      - name: activity_month
+        data_tests:
+          - not_null
+      - name: revenue_nzd
+        data_tests:
+          - not_null
