@@ -29,7 +29,7 @@ merged_map as (
         trim(old_id) as source_id,
         company_id as resolved_company_id
 
-    from companies, unnest(string_split(merged_object_ids, ';')) as ids(old_id)
+    from companies, unnest(string_split(merged_object_ids, ';')) as ids (old_id)
 
     where merged_object_ids is not null
 
@@ -43,4 +43,5 @@ combined as (
 
 )
 
-select distinct * from combined
+select * from combined
+group by all

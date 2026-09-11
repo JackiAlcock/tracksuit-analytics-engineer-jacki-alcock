@@ -1,0 +1,18 @@
+[sqlfluff]
+templater = dbt
+dialect = duckdb
+max_line_length = 100
+# structure.column_order (ST06) wants simple columns before calculated ones.
+# Staging models here deliberately mirror the source table's own column
+# order (just cast), which is a more useful convention for a 1:1 staging
+# layer than reordering by expression complexity — so this rule is off.
+exclude_rules = structure.column_order
+
+[sqlfluff:templater:dbt]
+profiles_dir = .
+project_dir = .
+profile = tracksuit_take_home
+target = dev
+
+[sqlfluff:rules:convention.casting_style]
+preferred_type_casting_style = shorthand

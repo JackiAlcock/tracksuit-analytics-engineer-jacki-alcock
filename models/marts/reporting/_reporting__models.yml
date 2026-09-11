@@ -4,11 +4,30 @@ models:
   - name: rpt_grr_monthly
     description: Monthly Gross Revenue Retention by customer size segment, for the last 12 months of available data.
     columns:
+      - name: report_month_segment_id
+        description: >
+          Surrogate key (report_month + size_grouped), one row per grain.
+          A deterministic hash via the surrogate_key macro, not a raw
+          concatenation — see macros/surrogate_key.sql.
+        data_tests:
+          - unique
+          - not_null
       - name: report_month
+        description: The calendar month (M) this GRR figure is calculated for.
         data_tests:
           - not_null
       - name: size_grouped
+        description: Customer size segment this row's GRR is calculated for.
         data_tests:
           - not_null
+      - name: cohort_revenue_nzd
+        description: >
+          Total revenue this segment's cohort billed at month M-12 (the
+          cohort's baseline, fixed at M-12).
+      - name: retained_revenue_nzd
+        description: >
+          Total revenue retained from that cohort at month M, capped per
+          customer at their own M-12 amount so expansion doesn't inflate
+          the figure — see rpt_grr_monthly.sql for the cap logic.
       - name: gross_revenue_retention_pct
         description: Cohort (M-12) revenue retained at month M, expansion excluded, as a percentage.

@@ -9,19 +9,40 @@ models:
         data_tests:
           - unique
           - not_null
+      - name: company_name
+        description: The company's display name in HubSpot.
       - name: size_grouped
         description: Customer size segment — the dimension GRR is segmented by.
         data_tests:
           - accepted_values:
-              values: ['Enterprise', 'Mid-Market', 'SMB', 'Startup']
+              arguments:
+                values: ['Enterprise', 'Mid-Market', 'SMB', 'Startup']
+      - name: industry
+        description: Industry classification from HubSpot.
+      - name: country
+        description: The company's HQ country.
+      - name: merged_object_ids
+        description: >
+          Semicolon-separated list of older HubSpot company IDs that have
+          since been merged into this record. Null if the company has never
+          been merged. See int_company_id_map for how this is resolved.
+      - name: created_at
+        description: When the company record was created in HubSpot.
 
   - name: stg_subskribe__accounts
     description: One row per Subskribe billing account, typed and lightly cleaned.
     columns:
       - name: account_id
+        description: Primary key. The Subskribe billing account ID.
         data_tests:
           - unique
           - not_null
+      - name: company_name
+        description: >
+          The billing account's name in Subskribe. Often, but not always,
+          matches the linked HubSpot company's name — 33 of 122 accounts in
+          the current dataset differ, so joins should use crmid/account_id,
+          not this column.
       - name: crmid
         description: >
           Reference to a HubSpot company_id. Does not always resolve
@@ -30,6 +51,55 @@ models:
           (2 in the current dataset) don't resolve at all.
         data_tests:
           - not_null
+      - name: currency
+        description: The account's billing currency (e.g. NZD, USD, GBP, AUD).
+      - name: created_at
+        description: When the billing account was created in Subskribe.
+
+  - name: stg_subskribe__invoices
+    description: One row per invoice issued against a subscription.
+    columns:
+      - name: invoice_id
+        description: Primary key. The Subskribe invoice ID.
+        data_tests:
+          - unique
+          - not_null
+      - name: account_id
+        description: Foreign key to stg_subskribe__accounts.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_subskribe__accounts')
+                field: account_id
+      - name: subscription_id
+        description: Foreign key to stg_subskribe__subscriptions.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_subskribe__subscriptions')
+                field: subscription_id
+      - name: invoice_date
+        description: When the invoice was issued. Used to attribute revenue to a calendar month.
+      - name: total
+        description: Invoice amount in the account's own billing currency.
+      - name: total_nzd
+        description: >
+          Invoice amount converted to NZD (Tracksuit's functional
+          currency). Used throughout the project as the single, comparable
+          revenue figure instead of `total`.
+      - name: currency
+        description: The invoice's currency (matches the billing account's currency).
+      - name: status
+        description: >
+          The invoice's status. VOIDED invoices are excluded from revenue
+          everywhere downstream (see int_invoices_monthly); PAID and
+          POSTED are both treated as billed revenue.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['PAID', 'POSTED', 'VOIDED']
 
   - name: stg_subskribe__subscriptions
     description: >
@@ -38,34 +108,37 @@ models:
       renewed_from_subscription_id — see int_subscriptions_chained.
     columns:
       - name: subscription_id
+        description: Primary key. The Subskribe subscription ID for this contract term.
         data_tests:
           - unique
           - not_null
       - name: account_id
+        description: Foreign key to stg_subskribe__accounts.
         data_tests:
           - not_null
           - relationships:
-              to: ref('stg_subskribe__accounts')
-              field: account_id
+              arguments:
+                to: ref('stg_subskribe__accounts')
+                field: account_id
       - name: subscription_state
+        description: The subscription's current state as recorded in Subskribe.
         data_tests:
           - accepted_values:
-              values: ['ACTIVE', 'EXPIRED', 'CANCELED']
-
-  - name: stg_subskribe__invoices
-    description: One row per invoice issued against a subscription.
-    columns:
-      - name: invoice_id
-        data_tests:
-          - unique
-          - not_null
-      - name: subscription_id
-        data_tests:
-          - not_null
-          - relationships:
-              to: ref('stg_subskribe__subscriptions')
-              field: subscription_id
-      - name: status
-        data_tests:
-          - accepted_values:
-              values: ['PAID', 'POSTED', 'VOIDED']
+              arguments:
+                values: ['ACTIVE', 'EXPIRED', 'CANCELED']
+      - name: start_date
+        description: When this subscription term started.
+      - name: end_date
+        description: When this subscription term ended, or is scheduled to end.
+      - name: cancelled_date
+        description: When this subscription was cancelled, if applicable. Null otherwise.
+      - name: renewed_from_subscription_id
+        description: >
+          If this subscription was renewed from a previous term, that
+          term's subscription_id. Null for the first subscription in a
+          customer's chain. Used by int_subscriptions_chained to reconstruct
+          continuous customer relationships across renewals.
+      - name: creation_time
+        description: When this row was first written in Subskribe.
+      - name: updated_at
+        description: When this row was last modified in Subskribe.

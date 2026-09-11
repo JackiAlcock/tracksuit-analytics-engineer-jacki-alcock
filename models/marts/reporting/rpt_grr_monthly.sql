@@ -30,10 +30,11 @@ max_month as (
 reporting_months as (
 
     -- the last 12 calendar months of data we actually have
-    select activity_month as report_month
+    select months.activity_month as report_month
     from months, max_month
-    where activity_month > max_month.latest_month - interval '12 months'
-      and activity_month <= max_month.latest_month
+    where
+        months.activity_month > max_month.latest_month - interval '12 months'
+        and months.activity_month <= max_month.latest_month
 
 ),
 
@@ -49,9 +50,10 @@ cohort_base as (
 
     from reporting_months
     inner join customer_months
-        on customer_months.activity_month = reporting_months.report_month - interval '12 months'
-       and customer_months.is_active
-       and customer_months.revenue_nzd > 0
+        on
+            customer_months.activity_month = reporting_months.report_month - interval '12 months'
+            and customer_months.is_active
+            and customer_months.revenue_nzd > 0
 
 ),
 
@@ -71,8 +73,9 @@ current_period_revenue as (
 
     from cohort_base
     left join customer_months as current_month
-        on current_month.customer_id = cohort_base.customer_id
-       and current_month.activity_month = cohort_base.report_month
+        on
+            cohort_base.customer_id = current_month.customer_id
+            and cohort_base.report_month = current_month.activity_month
 
 ),
 
@@ -86,7 +89,8 @@ grr_by_segment as (
         round(
             100.0 * sum(retained_revenue_nzd) / nullif(sum(cohort_revenue_nzd), 0),
             1
-        ) as gross_revenue_retention_pct
+        ) as gross_revenue_retention_pct,
+        {{ surrogate_key(['report_month', 'size_grouped']) }} as report_month_segment_id
 
     from current_period_revenue
     group by 1, 2
@@ -94,4 +98,4 @@ grr_by_segment as (
 )
 
 select * from grr_by_segment
-order by report_month, size_grouped
+order by 1, 2

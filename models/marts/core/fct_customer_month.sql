@@ -27,7 +27,9 @@ final as (
         customer_months.activity_month,
         customer_months.revenue_nzd,
         customer_months.is_active,
-        customers.customer_id || '_' || strftime(customer_months.activity_month, '%Y-%m') as customer_month_id
+        customers.customer_id
+        || '_'
+        || strftime(customer_months.activity_month, '%Y-%m') as customer_month_id
 
     from customer_months
     inner join customers

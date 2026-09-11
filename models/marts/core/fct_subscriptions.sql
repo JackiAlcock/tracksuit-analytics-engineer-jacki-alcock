@@ -14,7 +14,10 @@ subscriptions as (
 
 customers as (
 
-    select account_id, customer_id from {{ ref('dim_customers') }}
+    select
+        account_id,
+        customer_id
+    from {{ ref('dim_customers') }}
 
 )
 

@@ -37,7 +37,7 @@ subscription_months as (
                 {{ month_start('current_date') }}
             ),
             interval '1 month'
-        ) as month_series(activity_month)
+        ) as month_series (activity_month)
 
 ),
 
@@ -51,8 +51,9 @@ subscription_months_with_revenue as (
 
     from subscription_months
     left join monthly_revenue
-        on subscription_months.subscription_id = monthly_revenue.subscription_id
-        and subscription_months.activity_month = monthly_revenue.invoice_month
+        on
+            subscription_months.subscription_id = monthly_revenue.subscription_id
+            and subscription_months.activity_month = monthly_revenue.invoice_month
 
 ),
 

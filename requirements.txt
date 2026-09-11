@@ -1,2 +1,4 @@
 dbt-duckdb~=1.9
 duckdb~=1.1
+sqlfluff~=4.3
+sqlfluff-templater-dbt~=4.3

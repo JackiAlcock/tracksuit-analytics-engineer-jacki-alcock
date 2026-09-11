@@ -29,7 +29,7 @@ chain as (
     select
         sub.subscription_id,
         chn.root_subscription_id,
-        chn.chain_position + 1
+        chn.chain_position + 1 as chain_position
 
     from subscriptions as sub
     inner join chain as chn

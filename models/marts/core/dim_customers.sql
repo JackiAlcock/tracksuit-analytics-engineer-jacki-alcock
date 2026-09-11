@@ -25,7 +25,8 @@ companies as (
 customers as (
 
     select
-        coalesce(accounts_resolved.resolved_company_id, accounts_resolved.account_id) as customer_id,
+        coalesce(accounts_resolved.resolved_company_id, accounts_resolved.account_id)
+            as customer_id,
         accounts_resolved.account_id,
         accounts_resolved.billing_company_name,
         coalesce(companies.company_name, accounts_resolved.billing_company_name) as company_name,

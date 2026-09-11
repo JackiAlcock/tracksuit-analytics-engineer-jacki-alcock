@@ -155,6 +155,53 @@ rather than working only from descriptions of them.
     over-engineered version — documented as its own section in `SUBMISSION.md` (“Why
     GRR isn't in the dbt Semantic Layer”) rather than silently dropping the idea.
 
+## Adding build checks / CI
+
+21. **"should we add build checks? particularly linting using sqlfluff?"** — rather
+    than just wiring up a `.sqlfluff` config on faith, Claude built a full working copy
+    of the project in its own sandbox (raw CSVs, `load_raw_data.py`, all models/macros/
+    tests) and actually ran `dbt build` and `sqlfluff lint` end to end — the first real
+    execution of the whole project, not just a compile check. That run surfaced (and
+    fixed) something unrelated to SQLFluff too: 6 generic tests (`accepted_values`,
+    `relationships`) were using the pre-1.10.5 flat-argument YAML style, which now
+    throws a deprecation warning and needed nesting under `arguments:`. SQLFluff itself
+    then flagged 15 auto-fixable issues (fixed via `sqlfluff fix`, hand-diffed
+    afterwards to confirm nothing but whitespace and equality-side ordering changed)
+    and 5 that needed a manual call: an unaliased expression in the recursive CTE,
+    three genuinely ambiguous unqualified column references in `rpt_grr_monthly`
+    (two tables in scope, so `activity_month` alone was a real risk, not just a lint
+    nitpick), and a `GROUP BY`/`ORDER BY` addressing-style mismatch. One rule
+    (`structure.column_order`) was deliberately turned off rather than obeyed, since it
+    wanted staging models to reorder columns away from the source table's own column
+    order — documented as a comment in `.sqlfluff` rather than silently applied. Added
+    `sqlfluff`/`sqlfluff-templater-dbt` to `requirements.txt` (pinned to the exact
+    4.3.0 actually tested against, not a guess) and a GitHub Actions workflow
+    (`.github/workflows/ci.yml`) running `dbt build` + `sqlfluff lint` on every push/PR
+    — though Claude couldn't write that specific file itself (workflow files are
+    blocked from remote/automated writes as a safety measure on the device bridge it
+    was using), so I added it by hand from the content Claude gave me.
+
+27. **"are there any other build checks I've missed?"** followed by **"I thought about
+    unit tests but figured the small data sets and relatively straightforward logic
+    didn't warrant any for this task. Go ahead with the concrete gaps though"** — Claude
+    audited the actual current YAML/CI config (not a generic checklist) and found two
+    real, low-cost gaps rather than proposing a long wishlist: `relationships`/`not_null`
+    tests were applied consistently in staging but inconsistently above it — missing
+    entirely on `stg_subskribe__invoices.account_id` and `int_subscriptions_chained
+    .account_id`, and present as `not_null`-only (no `relationships`) on
+    `int_customer_months.account_id`, `fct_subscriptions.customer_id`, and
+    `fct_customer_month.customer_id`. Added the missing tests (49 → 56 data tests,
+    all passing). Separately proposed adding `macros/` to the CI SQLFluff lint scope,
+    but actually tested it first and found SQLFluff's dbt templater can't lint macro
+    files at all — it has no compiled-SQL node for a macro to check, so it just skips
+    the file with a warning; SQLFluff's own docs recommend excluding `macros/` outright.
+    So instead of a lint-scope change, added a `.sqlfluffignore` to make that exclusion
+    explicit rather than an unexplained warning on every run. dbt unit tests (native
+    `unit_tests:`, testing transformation logic against synthetic fixtures rather than
+    the real data) were raised as an option for the trickiest logic — the recursive
+    renewal-chain collapse and the GRR cap — but I judged the dataset size and logic
+    complexity here didn't justify the extra fixture-writing effort for this task.
+
 ## What I verified myself / changed
 
     At this point I compiled the code and reviewed in datagrip.
