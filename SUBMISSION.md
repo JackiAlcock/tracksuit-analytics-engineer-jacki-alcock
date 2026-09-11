@@ -89,3 +89,11 @@ you'd handle differently at Tracksuit scale: e.g. incremental
 materialization for `fct_customer_month` instead of a full rebuild, a
 proper SCD2 dimension once segment history exists, alerting on
 `is_unresolved_company` counts, package-managed tests via dbt_utils, etc.]
+
+- Unit tests for complicated logic.
+- Stakeholder sign-off on metrics definitions and data quality issues handling
+- Semantic layer for all common metrics
+- Incremental materialisation for all wide and long models
+- More sepcific linting conventionos enforced on commits
+- PR templates with checklists for pre-review steps (eg requiring evidence of a fulll run and regression testing)
+- SCD2 dimension modelling for all events-based source data

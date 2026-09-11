@@ -85,51 +85,34 @@ rather than working only from descriptions of them.
 
 ## Testing
 
-11. **"do i need to have core models for each test? isn't that native dbt test
-    functionality?"** — clarified that `unique`/`not_null`/`accepted_values`/
-    `relationships` are dbt's built-in generic tests, declared in YAML with no SQL
-    file needed; a `.sql` file under `tests/` is only for bespoke singular tests.
-
-12. **"yes, let's include that"** — added a singular test
+11. **"yes, let's include that"** — added a singular test
     (`tests/assert_grr_retention_capped.sql`, later renamed — see next) asserting
     `retained_revenue_nzd` never exceeds `cohort_revenue_nzd` in `rpt_grr_monthly`,
     since that invariant (the expansion cap) isn't covered by any generic test.
 
-13. **"oooft. can we call it something more succinct?"** — renamed the test file from
+12. **"oooft. can we call it something more succinct?"** — renamed the test file from
     `assert_grr_retained_revenue_not_greater_than_cohort_revenue.sql` to
     `assert_grr_retention_capped.sql`. Claude can't delete files on my machine (only
     read/write), so I deleted the old one myself once the new one landed.
 
 ## Formatting preferences
 
-14. **"i hate the extra whitespace to align column aliases. can we remove all the
+13. **"i hate the extra whitespace to align column aliases. can we remove all the
     compound spaces?"** — stripped the padding used to vertically align `as alias`
     across 10 files, leaving standard single spaces and untouched 4-space indentation.
 
-15. **"Instead of `with ctename as (` ... I prefer `with` / blank line / `ctename as
+14. **"Instead of `with ctename as (` ... I prefer `with` / blank line / `ctename as
     (`"** — reformatted the opening `with` clause of every model (13 files, including
     the `with recursive` case) to match.
 
-16. **"what about the marts models?"** followed by **"i really don't [see the
+15. **"what about the marts models?"** followed by **"i really don't [see the
     change]. can you check again?"** — turned out to be a stale VS Code buffer, not a
     real gap; Claude re-fetched the live files from disk to confirm the change had
     actually landed correctly.
 
-## Validation tooling (not project code)
-
-17. **"can you show me a lineage diagram?"** — a Mermaid DAG of the project
-    (sources → staging → intermediate → marts/core → marts/reporting), plus a pointer
-    to `dbt docs generate && dbt docs serve` for the real interactive/column-level
-    version.
-
-18. **"can I query this data using an ide like datagrip?" / "where do i add the file
-    path?"** — walked through connecting DataGrip to `tracksuit.duckdb` via its
-    built-in DuckDB driver, including the DuckDB single-writer-lock gotcha (DataGrip
-    and a running `dbt build` can't hold a write lock on the file at the same time).
-
 ## Refactoring for repetition
 
-19. **"is there anythying repetitive here that a macro might address?"** — Claude
+16. **"is there anythying repetitive here that a macro might address?"** — Claude
     grepped the actual codebase rather than guessing, and found `date_trunc('month',
     ...)` repeated 4 times across 2 files (genuinely worth a macro — added
     `macros/month_start.sql` and swapped all 4 call sites) versus two weaker
@@ -141,7 +124,7 @@ rather than working only from descriptions of them.
 
 ## Considering (and rejecting) a Semantic Layer
 
-20. **"can we add the reporting metrics as a semantic layer?"** — Claude researched
+17. **"can we add the reporting metrics as a semantic layer?"** — Claude researched
     dbt's Semantic Layer/MetricFlow rather than assuming it would just work: confirmed
     it's technically usable against a local DuckDB file (via `dbt-metricflow` +
     `mf query`, not one of dbt's officially-listed platforms but a working community
@@ -157,7 +140,7 @@ rather than working only from descriptions of them.
 
 ## Adding build checks / CI
 
-21. **"should we add build checks? particularly linting using sqlfluff?"** — rather
+18. **"should we add build checks? particularly linting using sqlfluff?"** — rather
     than just wiring up a `.sqlfluff` config on faith, Claude built a full working copy
     of the project in its own sandbox (raw CSVs, `load_raw_data.py`, all models/macros/
     tests) and actually ran `dbt build` and `sqlfluff lint` end to end — the first real
@@ -181,7 +164,41 @@ rather than working only from descriptions of them.
     blocked from remote/automated writes as a safety measure on the device bridge it
     was using), so I added it by hand from the content Claude gave me.
 
-27. **"are there any other build checks I've missed?"** followed by **"I thought about
+## Further style refinements
+
+19. **"review the yaml files. all models should have names and descriptions for all
+    their columns"** — Claude read every column list straight from the compiled SQL
+    (not the existing YAML, to avoid copying forward any gaps) and added a
+    `description` to every column across all 13 models that didn't already have one —
+    previously only columns carrying a `data_tests` entry were documented. Re-verified
+    with a full `dbt build` (49/49) and `dbt docs generate` before delivering, to catch
+    any column-name mismatches introduced in the rewrite.
+
+20. **"can the models be in alphabetical order in the yamls??"** — reordered the
+    `models:` blocks within each schema YAML alphabetically by model name (content
+    unchanged, order only); re-ran `dbt build` to confirm the reorder was purely
+    cosmetic.
+
+21. **"does dbt still suggest using a final cte and then select * from final?"** —
+    verification question against dbt Labs' current published style guide, rather than
+    relying on training knowledge that could be stale: still recommends every model end
+    with a bare `select * from <last_cte>`, but the convention is a *descriptive* name
+    for that CTE (`renamed`, `joined`, etc.), not the literal name `final` — which
+    matches what this project already does.
+
+22. **"i think using a group by all is more efficient than select distinct. is that
+    still correct?"** — verified against the actual DuckDB engine rather than
+    recollection: `EXPLAIN` showed `SELECT DISTINCT` and `GROUP BY ALL` compiling to
+    different physical operators in DuckDB 1.5.5 (`HASH_GROUP_BY` with a badly wrong
+    cardinality estimate vs. `PERFECT_HASH_GROUP_BY` with an accurate one), though
+    timing both head-to-head on 20M rows showed no difference for a standalone query —
+    the bad estimate only matters when it feeds a downstream join, which
+    `int_company_id_map` does. Swapped `select distinct * from combined` to
+    `select * from combined` / `group by all` in `int_company_id_map.sql`, confirmed
+    identical output (139 rows, matching a fresh distinct-count check) and a clean
+    `dbt build` + `sqlfluff lint`.
+
+23. **"are there any other build checks I've missed?"** followed by **"I thought about
     unit tests but figured the small data sets and relatively straightforward logic
     didn't warrant any for this task. Go ahead with the concrete gaps though"** — Claude
     audited the actual current YAML/CI config (not a generic checklist) and found two
@@ -201,6 +218,26 @@ rather than working only from descriptions of them.
     the real data) were raised as an option for the trickiest logic — the recursive
     renewal-chain collapse and the GRR cap — but I judged the dataset size and logic
     complexity here didn't justify the extra fixture-writing effort for this task.
+
+24. **"speaking of keys, is there anywhere a deterministic surrogate key might be
+    beneficial?"** followed by **"let's do the macro version"** — Claude checked the
+    actual models rather than reasoning generically about dimensional modelling, and
+    found `rpt_grr_monthly` had no surrogate key at all for its `(report_month,
+    size_grouped)` grain, and — unlike `fct_customer_month.customer_month_id` — nothing
+    tested that grain's uniqueness; a bug producing two rows for the same month/segment
+    would have gone uncaught. Three options were laid out: adopt `dbt_utils
+    .generate_surrogate_key` (the dbt Labs-recommended approach, but a new package
+    dependency this project doesn't otherwise have), write a small project-local hash
+    macro (same philosophy as `macros/month_start.sql` — a local macro over a package
+    for something this simple), or just extend the existing plain-concatenation style
+    used by `customer_month_id`. Went with the macro option: added
+    `macros/surrogate_key.sql` (coalesces each field to a null-safe string, joins with a
+    delimiter, hashes with DuckDB's native `md5()` — the same pattern `dbt_utils`' macro
+    uses under the hood, just without the dependency), used it for a new
+    `report_month_segment_id` column on `rpt_grr_monthly`, and added `unique` +
+    `not_null` tests on it. Verified the compiled SQL directly, confirmed 60 distinct
+    hashes for 60 rows (no collisions), and re-ran `dbt build` (58/58) and `sqlfluff
+    lint` clean before committing.
 
 ## What I verified myself / changed
 
