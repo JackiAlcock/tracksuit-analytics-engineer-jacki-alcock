@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-lint:
+    runs-on: ubuntu-latest
+    env:
+      DBT_PROFILES_DIR: .
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Load raw data
+        run: python load_raw_data.py
+
+      - name: dbt build (models + tests)
+        run: dbt build
+
+      - name: SQLFluff lint
+        run: sqlfluff lint models/ tests/

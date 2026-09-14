@@ -1,0 +1,120 @@
+version: 2
+
+models:
+  - name: int_accounts_resolved
+    description: Subskribe accounts joined to their resolved HubSpot company, with unresolved accounts flagged rather than dropped.
+    columns:
+      - name: account_id
+        description: Primary key. The Subskribe billing account ID.
+        data_tests:
+          - unique
+          - not_null
+      - name: billing_company_name
+        description: The billing account's own company_name, as recorded in Subskribe.
+      - name: crmid
+        description: The account's original, unresolved crmid value from Subskribe.
+      - name: resolved_company_id
+        description: >
+          The current HubSpot company_id this account resolves to, via
+          int_company_id_map. Null if the crmid doesn't resolve to any
+          known company, even after following merges.
+      - name: currency
+        description: The account's billing currency.
+      - name: created_at
+        description: When the billing account was created in Subskribe.
+      - name: is_unresolved_company
+        description: >
+          True if resolved_company_id is null — the account's crmid
+          doesn't match any current or historically-merged HubSpot
+          company_id (2 accounts in the current dataset).
+
+  - name: int_company_id_map
+    description: >
+      Every id (current or historically merged) a crmid might reference,
+      mapped to the current company_id. Exists because ~10% of Subskribe
+      accounts reference a HubSpot company_id that has since been merged
+      into a different one.
+    columns:
+      - name: source_id
+        description: >
+          An id that might appear as a Subskribe account's crmid — either
+          a current HubSpot company_id, or a historical id from a
+          company's merged_object_ids.
+      - name: resolved_company_id
+        description: The current HubSpot company_id that source_id resolves to.
+
+  - name: int_customer_months
+    description: One row per customer (account) per month they were under an in-force subscription, with that month's revenue.
+    columns:
+      - name: account_id
+        description: Foreign key to stg_subskribe__accounts.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_subskribe__accounts')
+                field: account_id
+      - name: activity_month
+        description: The calendar month (1st of month) this row represents.
+        data_tests:
+          - not_null
+      - name: revenue_nzd
+        description: >
+          This customer's billed revenue in this month, summed across any
+          concurrent or chained subscriptions. 0 if no invoice was billed
+          in the month despite an in-force subscription.
+      - name: is_active
+        description: >
+          Always true by construction — a row only exists for a customer
+          in a month they were under an in-force subscription. Kept as an
+          explicit column for downstream join clarity rather than relying
+          on row presence alone.
+
+  - name: int_invoices_monthly
+    description: Billed (non-VOIDED) invoice revenue in NZD, summed by subscription and calendar month.
+    columns:
+      - name: subscription_id
+        description: Foreign key to stg_subskribe__subscriptions.
+      - name: account_id
+        description: Foreign key to stg_subskribe__accounts.
+      - name: invoice_month
+        description: The calendar month (1st of month) that invoice_date falls in.
+      - name: revenue_nzd
+        description: Sum of total_nzd for all non-VOIDED invoices issued against this subscription in this month.
+
+  - name: int_subscriptions_chained
+    description: Subscriptions with renewal chains collapsed to a root_subscription_id representing one continuous customer relationship.
+    columns:
+      - name: subscription_id
+        description: Primary key. The Subskribe subscription ID for this contract term.
+        data_tests:
+          - unique
+          - not_null
+      - name: account_id
+        description: Foreign key to stg_subskribe__accounts.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_subskribe__accounts')
+                field: account_id
+      - name: subscription_state
+        description: The subscription's state as recorded in Subskribe (ACTIVE, EXPIRED, CANCELED).
+      - name: start_date
+        description: When this subscription term started.
+      - name: end_date
+        description: When this subscription term ended, or is scheduled to end.
+      - name: cancelled_date
+        description: When this subscription was cancelled, if applicable.
+      - name: renewed_from_subscription_id
+        description: The subscription_id this term renewed from, if any.
+      - name: root_subscription_id
+        description: >
+          The subscription_id of the first term in this customer's renewal
+          chain — the anchor of the recursive walk back through
+          renewed_from_subscription_id. All subscriptions in one continuous
+          customer relationship share the same root_subscription_id.
+      - name: chain_position
+        description: >
+          0-indexed position of this subscription within its renewal
+          chain (0 = the first/original term, 1 = its first renewal, etc).

@@ -1,0 +1,109 @@
+version: 2
+
+models:
+  - name: dim_customers
+    description: One row per customer (resolved HubSpot company, or the billing account itself where no company resolves), with their segment.
+    columns:
+      - name: customer_id
+        description: >
+          Primary key. The resolved HubSpot company_id, or the
+          account_id itself for the small number of accounts with no
+          resolvable company.
+        data_tests:
+          - unique
+          - not_null
+      - name: account_id
+        description: The Subskribe billing account this customer is derived from.
+      - name: billing_company_name
+        description: The billing account's own company_name, as recorded in Subskribe.
+      - name: company_name
+        description: >
+          The resolved HubSpot company's name, falling back to
+          billing_company_name where no company resolves.
+      - name: size_grouped
+        description: >
+          Customer size segment — the dimension GRR is segmented by.
+          'Unknown' for the small number of customers with no resolvable
+          HubSpot company.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Enterprise', 'Mid-Market', 'SMB', 'Startup', 'Unknown']
+      - name: industry
+        description: Industry classification from HubSpot. Null where no company resolves.
+      - name: country
+        description: HQ country from HubSpot. Null where no company resolves.
+      - name: currency
+        description: The customer's billing currency.
+      - name: is_unresolved_company
+        description: True if this customer's crmid never resolved to a HubSpot company, even after following merges.
+
+  - name: fct_customer_month
+    description: >
+      The dimensional model's core mart. One row per customer per calendar
+      month they were an active subscriber, with segment and revenue —
+      reusable for any subscription-over-time analysis, not just GRR.
+    columns:
+      - name: customer_month_id
+        description: Surrogate key (customer_id + month), one row per grain.
+        data_tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: Foreign key to dim_customers.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_id
+      - name: company_name
+        description: The customer's company name, as of today (this is a Type 1 dimension attribute — see dim_customers).
+      - name: size_grouped
+        description: The customer's size segment, as of today.
+      - name: activity_month
+        description: The calendar month (1st of month) this row represents.
+        data_tests:
+          - not_null
+      - name: revenue_nzd
+        description: This customer's billed revenue in this month.
+        data_tests:
+          - not_null
+      - name: is_active
+        description: Always true by construction — a row only exists for an active customer-month.
+
+  - name: fct_subscriptions
+    description: One row per subscription contract term, linked to its resolved customer and renewal chain.
+    columns:
+      - name: subscription_id
+        description: Primary key. The Subskribe subscription ID for this contract term.
+        data_tests:
+          - unique
+          - not_null
+      - name: root_subscription_id
+        description: >
+          The subscription_id of the first term in this customer's
+          renewal chain — shared by every subscription in one continuous
+          customer relationship.
+      - name: customer_id
+        description: Foreign key to dim_customers.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_id
+      - name: account_id
+        description: The Subskribe billing account this subscription belongs to.
+      - name: subscription_state
+        description: The subscription's state as recorded in Subskribe (ACTIVE, EXPIRED, CANCELED).
+      - name: start_date
+        description: When this subscription term started.
+      - name: end_date
+        description: When this subscription term ended, or is scheduled to end.
+      - name: cancelled_date
+        description: When this subscription was cancelled, if applicable.
+      - name: renewed_from_subscription_id
+        description: The subscription_id this term renewed from, if any.
+      - name: chain_position
+        description: 0-indexed position of this subscription within its renewal chain.

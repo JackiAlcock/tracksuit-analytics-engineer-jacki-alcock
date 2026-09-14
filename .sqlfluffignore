@@ -1,0 +1,7 @@
+# SQLFluff's dbt templater can't lint macro files at all — a macro has no
+# compiled SQL node in the dbt manifest (it's a Jinja template definition,
+# not a query dbt runs), so the templater skips it outright. Excluding it
+# here makes that a deliberate, silent exclusion instead of a WARNING on
+# every lint run. This is SQLFluff's own documented recommendation for
+# dbt projects, not a gap in test coverage.
+macros/
